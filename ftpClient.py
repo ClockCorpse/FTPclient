@@ -66,29 +66,28 @@ def retr(filePath,commandSocket):
     dataSocket.bind((host,dataPort))      
     if port(commandSocket,dataPort) == True:
         commandSocket.send(bytes('RETR '+filePath,'ASCII')+b'\x0d\x0a')
-        cmdData = commandSocket.recv(1024)
-        print(cmdData.decode('ASCII'),end='')
-        if int(cmdData.decode('ASCII')[:3]) == 150:
-            dataSocket.listen(1)
-            c,addr = dataSocket.accept()
-            with open(cwd+'/'+fileName,'wb') as f:
-                while True:
-                    maxLen = 1460
-                    data = c.recv(maxLen)
-                    f.write(data)
-                    if len(data)==0:
-                        break
-            f.close()
-            try:
-                cmdData = commandSocket.recv(1024)
-                print(cmdData.decode('ASCII'),end='')
-            except:
-                pass
-            dataSocket.close()
-        else:
+        try:
+            commandSocket.settimeout(2)
+            cmdData = commandSocket.recv(1024)
+        except:
             pass
-    else:
-        pass
+        print(cmdData.decode('ASCII'),end='')
+        dataSocket.listen(1)
+        c,addr = dataSocket.accept()
+        with open(cwd+'/'+fileName,'wb') as f:
+            while True:
+                maxLen = 1460
+                data = c.recv(maxLen)
+                f.write(data)
+                if len(data)==0:
+                    break
+        f.close()
+        try:
+            cmdData = commandSocket.recv(1024)
+            print(cmdData.decode('ASCII'),end='')
+        except:
+            pass
+        dataSocket.close()
 
 def changeLocalDir(cmd,commandSocket):
     global cwd
@@ -146,15 +145,11 @@ def changeDir(path,commandSocket):
         return False
 
 def manual():
-    print()
-    print("\tdir \t\t\t-- Get remote server's directory.")
     print('\tget [FILE NAME] \t-- Retrieve file from remote server.')
+    print("\tdir \t\t\t-- Get remote server's directory.")
     print('\tlcd [PATH] \t\t-- Change local directory.')
-    print('\thelp \t\t\t-- How the hell did you get here?')
     print('\tlcd \t\t\t-- Shows local current working directory.')
-    print('\tput [FILE PATH] \t-- Store file to remote server')
-    print()
-
+    print('\thelp \t\t\t-- How the hell did you get here?')
 
 def stor(filePath,cwd,commandSocket):
     cwd = cwd + '/' + filePath
@@ -190,68 +185,85 @@ def stor(filePath,cwd,commandSocket):
     else:
         print('File does not exists!')
 
-def Main():
-	try:
-		server = input("Enter server's IP: ")
-		commandSocket = socket.socket()
-		fileName = ''
-		try:
-			commandSocket.settimeout(10.0)
-			commandSocket.connect((server,commandPort))
-			data = commandSocket.recv(1024)
-			print(data.decode('ASCII'),end = '')
-			try:
-				commandSocket.settimeout(0.01)
-				data = commandSocket.recv(1024)
-				commandSocket.settimeout(0.01)
-				data = commandSocket.recv(1024)
-				print(data.decode('ASCII'),end = '')
-			except:
-				print('',end='')
-			USER = input('Enter username: ')
-			if login(USER,commandSocket) == True:
-				while True:
-					cmd = input('ftp> ')
-					if cmd[:3]=='get':
-						retr(cmd[4:],commandSocket)
-						try:
-							commandSocket.settimeout(1.0)
-							print(commandSocket.recv(1024).decode('ASCII'),end='')
-						except:
-							pass
-					if cmd[:3]=='dir':
-						getDir(commandSocket)
-						try:
-							print(commandSocket.recv(1024).decode('ASCII'),end='')
-						except:
-							pass
-					if cmd[:2]=='cd':
-						changeDir(cmd[3:],commandSocket)
-					if cmd[:3]=='lcd':
-						changeLocalDir(cmd,commandSocket)
-					if cmd[:4]=='help':
-						manual()
-					if cmd[:3]=='put':
-						stor(cmd[4:],cwd,commandSocket)
-						try:
-							commandSocket.settimeout(1.0)
-							print(commandSocket.recv(1024).decode('ASCII'),end='')
-						except:
-							pass
+def makeDir(folderName):
+    if os.path.exists(cwd+'/'+folderName):
+        print('Folder already exists!')
+    else:
+        os.mkdir(cwd+'/'+folderName)
 
-					if cmd == 'quit':
-						try:
-							logout(commandSocket)
-							break
-						except:
-							print('Server timeout!')
-							break
-					#options(cmd,commandSocket)
-			commandSocket.close()
-		except:
-			print('Unable to connect to server!')
-	except:
-		print()
-		print('Interupted!')
+def localdir():
+    listfile = os.listdir(cwd)
+    for fil in listfile:
+        print(fil)
+def rmDir(folderName):
+    if os.path.exists(cwd+'/'+folderName):
+        shutil.rmtree(cwd+'/'+folderName)
+    else:
+        print("Folder doesn't exists!")
+
+
+def Main():
+    server = input("Enter server's IP: ")
+    commandSocket = socket.socket()
+    fileName = ''
+    try:
+        commandSocket.settimeout(10.0)
+        commandSocket.connect((server,commandPort))
+        data = commandSocket.recv(1024)
+        print(data.decode('ASCII'),end = '')
+        try:
+            commandSocket.settimeout(0.01)
+            data = commandSocket.recv(1024)
+            print(data.decode('ASCII'),end = '')
+        except:
+            print('',end='')
+        USER = input('Enter username: ')
+        if login(USER,commandSocket) == True:
+            while True:
+                cmd = input('ftp> ')
+                if cmd[:3]=='get':
+                    retr(cmd[4:],commandSocket)
+                    try:
+                        commandSocket.settimeout(1.0)
+                        print(commandSocket.recv(1024).decode('ASCII'),end='')
+                    except:
+                        pass
+                if cmd[:3]=='dir':
+                    getDir(commandSocket)
+                    try:
+                        print(commandSocket.recv(1024).decode('ASCII'),end='')
+                    except:
+                        pass
+                if cmd[:2]=='cd':
+                    changeDir(cmd[3:],commandSocket)
+                if cmd[:3]=='lcd':
+                    changeLocalDir(cmd,commandSocket)
+                if cmd[:4]=='help':
+                    manual()
+                if cmd[:4] == 'ldir':
+                    localdir()
+                if cmd[:5]== 'mkdir':
+                    makeDir(cmd[6:])
+                if cmd[:5]== 'rmdir':
+                    rmDir(cmd[6:])
+                if cmd[:3]=='put':
+                    stor(cmd[4:],cwd,commandSocket)
+                    try:
+                        commandSocket.settimeout(1.0)
+                        print(commandSocket.recv(1024).decode('ASCII'),end='')
+                    except:
+                        pass
+                if cmd == 'quit':
+                    try:
+                        logout(commandSocket)
+                        break
+                    except:
+                        print('Server timeout!')
+                        break
+                #options(cmd,commandSocket)
+        commandSocket.close()
+    except:
+        print('Unable to connect to server!')
+
 if __name__ == '__main__':
     Main()
