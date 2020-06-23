@@ -3,6 +3,7 @@ from getpass import getpass
 import os
 import random
 import re
+import shutil
 
 print()
 print('--------------------------------------------')
